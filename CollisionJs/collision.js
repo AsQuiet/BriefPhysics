@@ -48,78 +48,145 @@ collision.vec = function(x=0,y=0) {
         this.x += v.x
         this.y += v.y
     }
+
+    this.norm = function() {
+        let mag = Math.sqrt(this.x * this.x + this.y * this.y)
+        this.x /= mag
+        this.y /= mag
+    }
+
+    this.copy = function() {
+        return new collision.vec(this.x, this.y)
+    }
+
+    this.perp = function() {
+        return new collision.vec(-this.y, this.x)
+    }
 }
 
 collision.vec.sub = function(v, u) {
     return new collision.vec(v.x - u.x, v.y - u.y)
 } 
 
-/**
- * The box object that is used for making the collision detection easier.
- */
-collision.box = function(center, w, h) {
+collision.projOverlap = function(p1, p2) {
 
-    this.center = center
+    if (p1.max > p2.min) {return true}
+    if (p1.min > p2.max) {return true}
 
-    this.topLeft = new collision.vec()
-    this.topRight = new collision.vec()
-    this.botLeft = new collision.vec()
-    this.botRight = new collision.vec()
-
-    this.width = w
-    this.height = h
-
-    // degrees
-    this.rotation = 0
-
-    this.calcCorners = function() {
-
-        this.topLeft = new collision.vec(this.center.x - this.width / 2, this.center.y - this.height / 2)
-        this.topRight = new collision.vec(this.center.x + this.width / 2, this.center.y - this.height / 2)
-
-        this.botLeft = new collision.vec(this.center.x - this.width / 2, this.center.y + this.height / 2)
-        this.botRight = new collision.vec(this.center.x + this.width / 2, this.center.y + this.height / 2)
-            
-    }
-
-    this.getCorner = function(c) {
-        switch (c) {
-            case 1:return this.topLeft
-            case 2:return this.topRight
-            case 3:return this.botRight
-            case 4:return this.botLeft
-            case 0:return this.center
-        }
-    }
-
-    this.rotateBox = function() {
-
-        let tlr = collision.vec.sub(this.topLeft, this.center)
-        let trr = collision.vec.sub(this.topRight, this.center)
-        let blr = collision.vec.sub(this.botLeft, this.center)
-        let brr = collision.vec.sub(this.botRight, this.center)
-        
-        tlr.rotate(this.rotation)
-        trr.rotate(this.rotation)
-        blr.rotate(this.rotation)
-        brr.rotate(this.rotation)
-
-        tlr.add(this.center)
-        trr.add(this.center)
-        blr.add(this.center)
-        brr.add(this.center)
-        
-        this.topLeft = tlr
-        this.topRight = trr
-        this.botLeft = blr
-        this.botRight = brr
     
-    }
-
-    this.calcCorners()
+    return false
 
 }
 
+collision.shape = function() {
+
+    // the vertices of this shape
+    this.vertices = []              // collision.vec
+    this.center = new collision.vec()
+
+    // rotation
+    this.rotationCenter = new collision.vec()
+    this.rotation = 0               // degrees
+
+    this.getVertices = function(n) {
+        if (n == undefined) {
+            return this.vertices
+        } else {
+            return this.vertices[n]
+        }
+    }
+
+    this.rotate = function(angle) {
+        this.rotation = (angle == undefined) ? this.rotation : angle
+    
+        for (let i = 0; i < this.vertices.length; i++) {
+
+            let rot = collision.vec.sub(this.vertices[i], this.rotationCenter)
+            rot.rotate(this.rotation)
+            rot.add(this.rotationCenter)
+            this.vertices[i] = rot
+
+        }
+
+    }
+
+    /**
+     * Sets the rotation center of this shape. No arguments will make the shape rotate around its center.
+     */
+    this.setRotationCenter = function(center) {
+        this.rotationCenter = (center == undefined) ? this.center.copy() : center
+    }
+
+    this.getAxis = function() {
+
+        let axis = []
+
+        for (let i = 0; i < this.vertices.length; i++) {
+
+            // getting this vertex and the next vertex
+            let p1 = this.vertices[i]
+            
+            let p2;
+
+            if (i + 1 == this.vertices.length) {
+                p2 = this.vertices[0]
+            } else {p2 = this.vertices[i+1]}
+
+            let edge = collision.vec.sub(p2, p1)
+
+            let normal = edge.perp()
+            normal.norm()
+            axis.push(normal)
+
+        }
+
+        return axis
+
+    }
+
+    this.project = function(axis) {
+
+        let max =  -Infinity, min = Infinity;
+
+        for (let i = 0; i < this.vertices.length; i++) {
+
+            p = axis.dot(this.vertices[i])
+            if (p > max) {
+                max = p
+            } else if (p < min) {
+                min = p
+            }
+        }
+
+        return {max:max, min:min}
+
+    }
+
+    
+
+}
+
+collision.generateRect = function(x, y, w, h) {
+    square = new collision.shape()
+    square.vertices.push(new collision.vec(x, y))
+    square.vertices.push(new collision.vec(x + w, y))
+    square.vertices.push(new collision.vec(x + w, y + h))
+    square.vertices.push(new collision.vec(x, y + h))
+    square.center = new collision.vec(x + w/2, y + h/2)
+    return square
+}
+
+collision.generateRectWithCenter = function(x, y, w, h) {
+    square = new collision.shape()
+    w2 = w / 2
+    h2 = h / 2
+    square.vertices.push(new collision.vec(x - w2, y - h2))
+    square.vertices.push(new collision.vec(x + w2, y - h2))
+    square.vertices.push(new collision.vec(x + w2, y + h2))
+    square.vertices.push(new collision.vec(x - w2, y + h2))
+    square.center = new collision.vec(x, y)
+    return square
+}
 
 // *************************************************************
 // COLLISION DETECTION FUNCTIONS => functions that user will call
@@ -129,50 +196,59 @@ collision.box = function(center, w, h) {
 /**
  * Detects the collision of two rectangles with no rotation.
  */
-collision.rect = function(x1, y1, w1, h1, x2, y2, w2, h2) {
+collision.rectRect = function(x1, y1, w1, h1, x2, y2, w2, h2) {
     return (x1 <= x2 + w2 &&
             x1 + w1 >= x2 &&
             y1 <= y2 + h2 &&
             y1 + h1 >= y2)
 }
 
-collision.rectRot = function(x1, y1, w1, h1, a1, x2, y2, w2, h2, a2) {
+/**
+ * Detects the collision of two rectangles with rotation using the Separating Axis Theorem.
+ */
+collision.rectRectRot = function(x1, y1, w1, h1, a1, x2, y2, w2, h2, a2) {
 
-    // constructing boxes
-    box1 = new collision.box(new collision.vec(x1 + w1 / 2, y1 + h1 / 2), w1, h1)
-    box2 = new collision.box(new collision.vec(x2 + w2 / 2, y2 + h2 / 2), w2, h2)
+    rect1 = collision.generateRect(x1, y1, w1, h1)
+    rect2 = collision.generateRect(x2, y2, w2, h2)
 
-    box1.rotation = a1
-    box2.rotation = a2
+    rect1.setRotationCenter()
+    rect2.setRotationCenter()
 
-    box1.rotateBox()
-    box2.rotateBox()  
+    rect1.rotate(a1)
+    rect2.rotate(a2)
+
+    axis1 = rect1.getAxis()
+    axis2 = rect2.getAxis()
     
-    // finding the corners to use => wich of the four corners are closest to each other
-    let box1ClosestPoint, box2ClosestPoint;
+    for (let i = 0; i < axis1.length; i++) {
 
-    let recordDist = Infinity
-    for (let i = 1; i < 5; i++) {
+        let a = axis1[i]
 
-        for (let j = 1; j < 5; j++) {
+        let p1 = rect1.project(a)
+        let p2 = rect2.project(a)
 
-            d = (box1.getCorner(i)).dist(box2.getCorner(j))
-            // console.log(str(d) + " - " + str(i) +  "   *   " + str(j))
-            if (d < recordDist) {
-                box1ClosestPoint = i
-                box2ClosestPoint = j
-                recordDist = d
-            }
-
+        if (!collision.projOverlap(p1, p2)) {
+            // shapes are not colliding
+            return false
         }
 
     }
 
-    console.log(box1)
-    console.log(box2)
+    for (let i = 0; i < axis2.length; i++) {
 
-    console.log(box1ClosestPoint)
-    console.log(box2ClosestPoint)
+        let a = axis2[i]
 
-    return false
+        let p1 = rect1.project(a)
+        let p2 = rect2.project(a)
+
+        if (!collision.projOverlap(p1, p2)) {
+            // shapes are not colliding
+            return false
+        }
+
+    }    
+
+    console.log("COLLISION")
+    return true
+
 }

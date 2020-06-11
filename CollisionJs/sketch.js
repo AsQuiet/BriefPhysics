@@ -1,4 +1,7 @@
 
+let sq;
+let sq2;
+
 function setup() {
     createCanvas(800,800)
 
@@ -7,32 +10,19 @@ function setup() {
 function draw() {
     background(51)
     
+    sq = collision.generateRect(100, 100, 200, 200)
+    sq2 = collision.generateRect(mouseX, mouseY, 100, 100)
+    sq.setRotationCenter()
+    sq.rotate(45)
+    beginShape()
+    for (let i = 0; i < sq2.vertices.length; i++) {vertex(sq2.getVertices(i).x,sq2.getVertices(i).y)}
+    endShape(CLOSE)
 
-    // // drawing the first rectangle
-    // push()
-    // angleMode(DEGREES)
-    // translate(200,200)
-    // rotate(0)
-    // rectMode(CENTER)
-    // rect(0,0,100,100)
+    beginShape()
+    for (let i = 0; i < sq.vertices.length; i++) {vertex(sq.getVertices(i).x,sq.getVertices(i).y)}
+    endShape(CLOSE)
 
-    // pop()
+    console.log(collision.rectRectRot(100, 100, 200, 200, 45, mouseX, mouseY, 100, 100, 0))
     
-
-    // // drawing the sec rectangle
-    // push()
-    // angleMode(DEGREES)
-    // translate(1500,250)
-    // rotate(45)
-    // rectMode(CENTER)
-    // rect(0,0,150,150)
-
-    // pop()
-    
-    // collision detection
-    console.log(collision.rectRot(  200,200,100,100, 0,  300,250,150,150, 45  ) )   
-    // box1 => 200,200
-    // box2 => 300 250
-    noLoop()
 }
 
