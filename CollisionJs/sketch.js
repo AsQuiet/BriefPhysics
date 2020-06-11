@@ -1,28 +1,42 @@
 
-let sq;
-let sq2;
+let s1;
+let s2;
 
 function setup() {
     createCanvas(800,800)
 
-}
+    s1 = collision.generateRect(100, 100, 200, 200)
+    s2 = collision.generateRect(250, 290, 150, 150)
+
+    s1.setRotationCenter()
+    s2.setRotationCenter()
+
+    s1.rotate(0)
+    s2.rotate(13)
+
+}   
 
 function draw() {
     background(51)
-    
-    sq = collision.generateRect(100, 100, 200, 200)
-    sq2 = collision.generateRect(mouseX, mouseY, 100, 100)
-    sq.setRotationCenter()
-    sq.rotate(45)
-    beginShape()
-    for (let i = 0; i < sq2.vertices.length; i++) {vertex(sq2.getVertices(i).x,sq2.getVertices(i).y)}
-    endShape(CLOSE)
+    fill(180, 100)
+    stroke(255)
 
-    beginShape()
-    for (let i = 0; i < sq.vertices.length; i++) {vertex(sq.getVertices(i).x,sq.getVertices(i).y)}
-    endShape(CLOSE)
+    if (collision.sat(s1, s2)) {fill(255, 0, 0, 100)}
 
-    console.log(collision.rectRectRot(100, 100, 200, 200, 45, mouseX, mouseY, 100, 100, 0))
-    
+    drawShape(s1)
+    drawShape(s2)
+    noLoop()
+
 }
 
+
+function drawShape(s) {
+    beginShape()
+
+    for (let i = 0; i < s.vertices.length; i++) {
+        vertex(s.vertices[i].x,s.vertices[i].y)
+    }
+
+    endShape(CLOSE)
+
+}

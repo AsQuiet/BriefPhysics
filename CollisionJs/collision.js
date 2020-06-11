@@ -60,7 +60,7 @@ collision.vec = function(x=0,y=0) {
     }
 
     this.perp = function() {
-        return new collision.vec(-this.y, this.x)
+        return new collision.vec((this.y == 0) ? 0 : -this.y, this.x)
     }
 }
 
@@ -68,15 +68,7 @@ collision.vec.sub = function(v, u) {
     return new collision.vec(v.x - u.x, v.y - u.y)
 } 
 
-collision.projOverlap = function(p1, p2) {
 
-    if (p1.max > p2.min) {return true}
-    if (p1.min > p2.max) {return true}
-
-    
-    return false
-
-}
 
 collision.shape = function() {
 
@@ -101,7 +93,8 @@ collision.shape = function() {
     
         for (let i = 0; i < this.vertices.length; i++) {
 
-            let rot = collision.vec.sub(this.vertices[i], this.rotationCenter)
+            // let rot = collision.vec.sub(this.vertices[i], this.rotationCenter)
+            let rot = collision.vec.sub(this.rotationCenter,this.vertices[i])
             rot.rotate(this.rotation)
             rot.add(this.rotationCenter)
             this.vertices[i] = rot
@@ -117,75 +110,43 @@ collision.shape = function() {
         this.rotationCenter = (center == undefined) ? this.center.copy() : center
     }
 
-    this.getAxis = function() {
+    this.getEdges = function() {
 
-        let axis = []
-
-        for (let i = 0; i < this.vertices.length; i++) {
-
-            // getting this vertex and the next vertex
-            let p1 = this.vertices[i]
-            
-            let p2;
-
-            if (i + 1 == this.vertices.length) {
-                p2 = this.vertices[0]
-            } else {p2 = this.vertices[i+1]}
-
-            let edge = collision.vec.sub(p2, p1)
-
-            let normal = edge.perp()
-            normal.norm()
-            axis.push(normal)
-
-        }
-
-        return axis
-
-    }
-
-    this.project = function(axis) {
-
-        let max =  -Infinity, min = Infinity;
+        let edges = [];
 
         for (let i = 0; i < this.vertices.length; i++) {
 
-            p = axis.dot(this.vertices[i])
-            if (p > max) {
-                max = p
-            } else if (p < min) {
-                min = p
-            }
+            let v1 = this.vertices[i]
+            let v2 = (i + 1 == this.vertices.length) ? this.vertices[0] : this.vertices[i+1]
+
+            edges.push(collision.vec.sub(v2, v1).copy())
+
         }
 
-        return {max:max, min:min}
-
+        return edges
     }
-
-    
 
 }
 
 collision.generateRect = function(x, y, w, h) {
-    square = new collision.shape()
-    square.vertices.push(new collision.vec(x, y))
-    square.vertices.push(new collision.vec(x + w, y))
-    square.vertices.push(new collision.vec(x + w, y + h))
-    square.vertices.push(new collision.vec(x, y + h))
-    square.center = new collision.vec(x + w/2, y + h/2)
-    return square
+    boxShape = new collision.shape()
+    boxShape.vertices.push(new collision.vec(x, y))
+    boxShape.vertices.push(new collision.vec(x + w, y))
+    boxShape.vertices.push(new collision.vec(x + w, y + h))
+    boxShape.vertices.push(new collision.vec(x, y + h))
+    boxShape.center = new collision.vec(x + w/2, y + h/2)
+    return boxShape
 }
 
 collision.generateRectWithCenter = function(x, y, w, h) {
-    square = new collision.shape()
-    w2 = w / 2
-    h2 = h / 2
-    square.vertices.push(new collision.vec(x - w2, y - h2))
-    square.vertices.push(new collision.vec(x + w2, y - h2))
-    square.vertices.push(new collision.vec(x + w2, y + h2))
-    square.vertices.push(new collision.vec(x - w2, y + h2))
-    square.center = new collision.vec(x, y)
-    return square
+    boxShape = new collision.shape()
+    w2 = w / 2, h2 = h / 2
+    boxShape.vertices.push(new collision.vec(x - w2, y - h2))
+    boxShape.vertices.push(new collision.vec(x + w2, y - h2))
+    boxShape.vertices.push(new collision.vec(x + w2, y + h2))
+    boxShape.vertices.push(new collision.vec(x - w2, y + h2))
+    boxShape.center = new collision.vec(x, y)
+    return boxShape
 }
 
 // *************************************************************
@@ -208,47 +169,82 @@ collision.rectRect = function(x1, y1, w1, h1, x2, y2, w2, h2) {
  */
 collision.rectRectRot = function(x1, y1, w1, h1, a1, x2, y2, w2, h2, a2) {
 
-    rect1 = collision.generateRect(x1, y1, w1, h1)
-    rect2 = collision.generateRect(x2, y2, w2, h2)
+    s1 = collision.generateRect(x1, y1, w1, h1)
+    s2 = collision.generateRect(x2, y2, w2, h2)
 
-    rect1.setRotationCenter()
-    rect2.setRotationCenter()
+    s1.setRotationCenter()
+    s2.setRotationCenter()
 
-    rect1.rotate(a1)
-    rect2.rotate(a2)
+    s1.rotate(a1)
+    s2.rotate(a2)
 
-    axis1 = rect1.getAxis()
-    axis2 = rect2.getAxis()
-    
-    for (let i = 0; i < axis1.length; i++) {
+    return collision.sat(s1, s2)
 
-        let a = axis1[i]
+}
 
-        let p1 = rect1.project(a)
-        let p2 = rect2.project(a)
 
-        if (!collision.projOverlap(p1, p2)) {
-            // shapes are not colliding
+collision.sat = function(shape1, shape2) {
+
+    // for each shape
+    // step 1 get perp vectors for each edge of the shape
+    // step 2 use dot product to get projection of each vertex with this edge perp
+    // step 3 get smallest and biggest projections
+    // step 4 check for gaps between all the projections
+
+    // all the perpendicular lines of the edges
+    let perpLines = []
+
+    // the edges of the two shapes 
+    let edges1 = shape1.getEdges(), edges2 = shape2.getEdges()
+
+    for (let i = 0; i < edges1.length; i++) {
+        perpLines.push(edges1[i].perp())
+    }
+
+    for (let i = 0; i < edges2.length; i++) {
+        perpLines.push(edges2[i].perp())
+    }
+
+    for (let i = 0; i < perpLines.length; i++) {
+
+        let amax = -Infinity;
+        let amin = Infinity;
+        let bmax = -Infinity;
+        let bmin = Infinity;
+
+        for (let j = 0; j < shape1.vertices.length; j++) {
+
+            let dot = perpLines[i].dot(shape1.vertices[j])
+
+            if (dot < amin) {
+                amin = dot
+            } else if (dot > amax) {
+                amax = dot
+            }
+
+        }
+
+        for (let j = 0; j < shape2.vertices.length; j++) {
+
+            let dot = perpLines[i].dot(shape2.vertices[j])
+
+            if (dot < bmin) {
+                bmin = dot
+            } else if (dot > bmax) {
+                bmax = dot
+            }
+
+        }
+
+        if ( (amin < bmax && amin > bmax) || (bmin < amax && bmin > amin) ) {
+            console.log("might be colliding")
+        } else {
+            console.log("not colliding")
             return false
         }
 
     }
-
-    for (let i = 0; i < axis2.length; i++) {
-
-        let a = axis2[i]
-
-        let p1 = rect1.project(a)
-        let p2 = rect2.project(a)
-
-        if (!collision.projOverlap(p1, p2)) {
-            // shapes are not colliding
-            return false
-        }
-
-    }    
-
-    console.log("COLLISION")
+    console.log("coll")
     return true
 
 }
