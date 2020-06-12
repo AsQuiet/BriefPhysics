@@ -11,7 +11,6 @@ let collision = (function () {
         return degrees * Math.PI / 180
     }
 
-
     // ===============================
     // VECTOR
     // ===============================
@@ -83,7 +82,7 @@ let collision = (function () {
             for (let i = 0; i < this.vertices.length; i++) {vertex(this.vertices[i].x,this.vertices[i].y)}
             endShape(CLOSE)
         } : function(){}
-
+        
     }
 
     /*** Rotates each vertex of this shape relative to the rotationcenter of this shape. 
@@ -107,8 +106,6 @@ let collision = (function () {
     shape.prototype.setRotationCenter = function (center) {
         this.rotationCenter = (center == undefined) ? this.center : center.copy()
     }
-
-
 
     // ===============================
     // SHAPE GENERATORS
@@ -188,7 +185,7 @@ let collision = (function () {
         return poly
     }
 
-    /** Returns a polygon from the given vector objects. The vectors need to have an x and y component. */
+    /** Returns a polygon from the given vector objects. The vectors need to have x and y components. */
     function createPolygonFromVecs(vertices) {
         let poly = new shape()
 
@@ -199,17 +196,89 @@ let collision = (function () {
         return poly
     }
     
-
     // ===============================
     // COLLISION DETECTION
     // ===============================
     
+    /** Checks whether or not the two given shapes are colliding. If the third arguments is true it will also check whether or not the second shape is inside the first shape. */
+    function polyPoly(shape1, shape2, inside=true) {
+        // http://www.jeffreythompson.org/collision-detection/rect-rect.php
+
+        // is the second shape inside the first shape
+        if (inside) {if (polyPoint(shape1, shape2.vertices[0].x, shape2.vertices[0].y)) {return true}}
+
+        // Comparing each edge of the shape with each edge of the other shape. 
+        for (let i = 0; i < shape1.vertices.length; i++) {
+
+            // this edge
+            let p1 = shape1.vertices[i]
+            let p2 = (i + 1 == shape1.vertices.length) ? shape1.vertices[0] : shape1.vertices[i+1]
+
+            for (let j = 0; j < shape2.vertices.length; j++) {
+
+                // other edge 
+                let p3 = shape2.vertices[j]
+                let p4 = (j + 1 == shape2.vertices.length) ? shape2.vertices[0] : shape2.vertices[j + 1]
+
+                // checking for collisions
+                if (lineLine(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y)) {
+                    return true
+                }
+
+            }
+        }   
+
+        return false
+    }
+
+    /** Returns true if the given point is inside the given polygon. */
+    function polyPoint(shape, px, py) {
+        let col = false
+
+        for (let i = 0; i < shape.vertices.length; i++) {
+
+            let vc = shape.vertices[i]
+            let vn = (i + 1 == shape.vertices.length) ? shape.vertices[0] : shape.vertices[i+1]
+
+            if (((vc.y > py && vn.y < py) || (vc.y < py && vn.y > py)) &&
+                (px < (vn.x-vc.x)*(py-vc.y) / (vn.y-vc.y)+vc.x)) {
+                    col = !col;
+            }
+
+        }
+
+        return col
+    }
+
     /** Returns the collision between two non-rotating rectangles. */
     function rectRect(x1, y1, w1, h1, x2, y2, w2, h2) {
         return (x1 <= x2 + w2 &&
             x1 + w1 >= x2 &&
             y1 <= y2 + h2 &&
             y1 + h1 >= y2)
+    }
+
+    /** Detects the collision between the two given circles. */
+    function circleCircle(x1, y1, r1, x2, y2, r2) {
+        let dx = x2 - x1, dy = y2 - y1
+        let dist = Math.sqrt(dx * dx + dy * dy)
+        return dist < r1 + r2
+    }
+
+    /** Detects the collision between the two given line segments. */
+    function lineLine(a1, b1, c1, d1, a2, b2, c2, d2) {
+        // https://gamedev.stackexchange.com/questions/26004/how-to-detect-2d-line-on-line-collision
+        let denominator = ((c1 - a1) * (d2 - b2)) - ((d1 - b1) * (c2 - a2));
+        let numerator1 = ((b1 - b2) * (c2 - a2)) - ((a1 - a2) * (d2 - b2));
+        let numerator2 = ((b1 - b2) * (c1 - a1)) - ((a1 - a2) * (d1 - b1));
+
+        // Detect coincident lines (has a problem, read below)
+        if (denominator == 0) return numerator1 == 0 && numerator2 == 0;
+
+        let r = numerator1 / denominator;
+        let s = numerator2 / denominator;
+
+        return (r >= 0 && r <= 1) && (s >= 0 && s <= 1);
     }
 
 
@@ -223,6 +292,13 @@ let collision = (function () {
     gen.createPolygon = createPolygon
     gen.createPolygonFromVecs = createPolygonFromVecs
     col.gen = gen
-    col.rectRect = rectRect
+
+    // collision
+    col.rectRect                = rectRect
+    col.circleCircle            = circleCircle
+    col.lineLine                = lineLine
+    col.polyPoint               = polyPoint
+    col.polyPoly                = polyPoly
+
     return col  
 })()
