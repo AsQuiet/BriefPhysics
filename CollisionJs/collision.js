@@ -300,6 +300,15 @@ let collision = (function () {
         return dist < r1 + r2
     }
 
+    /** Returns the collision between a rectangle and a circle. */
+    function rectEllipse(x, y, w, h, cx, cy, cw, ch) {
+
+        let r = createRect(x,y,w,h)
+        let c = createEllipse(cx, cy, cw, ch)
+
+        return polyPoly(r,c)
+    }
+
 
     // ===============================
     // EXPORTING
@@ -315,6 +324,7 @@ let collision = (function () {
     // collision
     col.rectRect                = rectRect
     col.rectRectRotate          = rectRectRotate
+    col.rectEllipse             = rectEllipse
     col.circleCircle            = circleCircle
     col.lineLine                = lineLine
     col.polyPoint               = polyPoint
