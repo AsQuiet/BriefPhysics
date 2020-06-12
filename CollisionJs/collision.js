@@ -77,12 +77,8 @@ let collision = (function () {
         this.rotation = 0  
 
         /** Draws this shape to a p5.js canvas, if included. */
-        this.drawShape = (typeof beginShape == 'function') ? function() {
-            beginShape() 
-            for (let i = 0; i < this.vertices.length; i++) {vertex(this.vertices[i].x,this.vertices[i].y)}
-            endShape(CLOSE)
-        } : function(){}
-        
+        this.drawShape = function(){}
+        this.createDrawFunction()
     }
 
     /*** Rotates each vertex of this shape relative to the rotationcenter of this shape. 
@@ -104,7 +100,16 @@ let collision = (function () {
 
     /** Sets the new rotation center of this shape. No arguments will cause this shape to rotate around it's center. */
     shape.prototype.setRotationCenter = function (center) {
-        this.rotationCenter = (center == undefined) ? this.center : center.copy()
+        this.rotationCenter = (center == undefined) ? this.center : center
+    }
+
+    /** Creates the shape.drawShape function, can only be used with p5.js, should be used when creating the shape before p5 is loaded in. */
+    shape.prototype.createDrawFunction = function() {
+        this.drawShape = (typeof beginShape == 'function') ? function() {
+            beginShape() 
+            for (let i = 0; i < this.vertices.length; i++) {vertex(this.vertices[i].x,this.vertices[i].y)}
+            endShape(CLOSE)
+        } : function(){}
     }
 
     // ===============================
@@ -250,21 +255,6 @@ let collision = (function () {
         return col
     }
 
-    /** Returns the collision between two non-rotating rectangles. */
-    function rectRect(x1, y1, w1, h1, x2, y2, w2, h2) {
-        return (x1 <= x2 + w2 &&
-            x1 + w1 >= x2 &&
-            y1 <= y2 + h2 &&
-            y1 + h1 >= y2)
-    }
-
-    /** Detects the collision between the two given circles. */
-    function circleCircle(x1, y1, r1, x2, y2, r2) {
-        let dx = x2 - x1, dy = y2 - y1
-        let dist = Math.sqrt(dx * dx + dy * dy)
-        return dist < r1 + r2
-    }
-
     /** Detects the collision between the two given line segments. */
     function lineLine(a1, b1, c1, d1, a2, b2, c2, d2) {
         // https://gamedev.stackexchange.com/questions/26004/how-to-detect-2d-line-on-line-collision
@@ -281,6 +271,35 @@ let collision = (function () {
         return (r >= 0 && r <= 1) && (s >= 0 && s <= 1);
     }
 
+    /** Returns the collision between two non-rotating rectangles. */
+    function rectRect(x1, y1, w1, h1, x2, y2, w2, h2) {
+        return (x1 <= x2 + w2 &&
+            x1 + w1 >= x2 &&
+            y1 <= y2 + h2 &&
+            y1 + h1 >= y2)
+    }
+
+    /** Returns the collision between two rotating rectangles. (rotating is around the center of the rectangle) */
+    function rectRectRotate(x1, y1, w1, h1, a1, x2, y2, w2, h2, a2) {
+        let s1 = createRect(x1, y1, w1, h1)
+        let s2 = createRect(x2, y2, w2, h2)
+        
+        s1.setRotationCenter()
+        s2.setRotationCenter()
+
+        s1.rotate(a1)
+        s2.rotate(a2)
+
+        return polyPoly(s1, s2,true)
+    }
+
+    /** Detects the collision between the two given circles. */
+    function circleCircle(x1, y1, r1, x2, y2, r2) {
+        let dx = x2 - x1, dy = y2 - y1
+        let dist = Math.sqrt(dx * dx + dy * dy)
+        return dist < r1 + r2
+    }
+
 
     // ===============================
     // EXPORTING
@@ -295,6 +314,7 @@ let collision = (function () {
 
     // collision
     col.rectRect                = rectRect
+    col.rectRectRotate          = rectRectRotate
     col.circleCircle            = circleCircle
     col.lineLine                = lineLine
     col.polyPoint               = polyPoint
