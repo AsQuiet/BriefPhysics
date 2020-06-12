@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+        // "checkJs": true
+    },
+    "include": ["index.html","collision.js", "sketch.js"]
+    
+  }
