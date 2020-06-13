@@ -235,6 +235,10 @@ let collision = (function () {
     // COLLISION DETECTION
     // ===============================
     
+    // ===============================
+    // POLYGON DETECTION
+    // ===============================
+
     /** Checks whether or not the two given shapes are colliding. If the third arguments is true it will also check whether or not the second shape is inside the first shape. */
     function polyPoly(shape1, shape2, inside=true) {
         // http://www.jeffreythompson.org/collision-detection/rect-rect.php
@@ -285,43 +289,125 @@ let collision = (function () {
         return col
     }
 
-    /** Detects the collision between the two given line segments. */
-    function lineLine(a1, b1, c1, d1, a2, b2, c2, d2) {
+    // ===============================
+    // LINE DETECTION
+    // ===============================
+
+    /** Detects the collision between the two given line segments. If returnpoint is true, will return a vector object if collision else undefined. */
+    function lineLine(a1, b1, c1, d1, a2, b2, c2, d2, returnPoint=false) {
         // https://gamedev.stackexchange.com/questions/26004/how-to-detect-2d-line-on-line-collision
         let denominator = ((c1 - a1) * (d2 - b2)) - ((d1 - b1) * (c2 - a2));
         let numerator1 = ((b1 - b2) * (c2 - a2)) - ((a1 - a2) * (d2 - b2));
         let numerator2 = ((b1 - b2) * (c1 - a1)) - ((a1 - a2) * (d1 - b1));
 
         // Detect coincident lines (has a problem, read below)
-        if (denominator == 0) return numerator1 == 0 && numerator2 == 0;
+        if (denominator == 0 && !returnPoint) return numerator1 == 0 && numerator2 == 0;
+        if (denominator == 0) {return undefined}
 
         let r = numerator1 / denominator;
         let s = numerator2 / denominator;
 
-        return (r >= 0 && r <= 1) && (s >= 0 && s <= 1);
+        let col = (r >= 0 && r <= 1) && (s >= 0 && s <= 1)
+
+        if (col && returnPoint) {
+            // calculating collision point
+            let x = a1 + (r * (c1-a1));
+            let y = b1 + (r * (d1-b1));
+            return {x:x,y:y}
+        }
+
+        return col;
     }
 
-    /** Returns the collision between two non-rotating rectangles. */
-    function rectRect(x1, y1, w1, h1, x2, y2, w2, h2) {
-        return (x1 <= x2 + w2 &&
-            x1 + w1 >= x2 &&
-            y1 <= y2 + h2 &&
-            y1 + h1 >= y2)
+    // ===============================
+    // RECTANGLE DETECTION
+    // ===============================
+
+    /** Returns the collision between two rectangles. If givan an angle (in degrees), will check for collision between two rotating rectangles. */
+    function rectRect(x1, y1, w1, h1, x2, y2, w2, h2, a1=undefined, a2=undefined) {
+
+        if (a1 == undefined) {
+            return (x1 <= x2 + w2 &&
+                x1 + w1 >= x2 &&
+                y1 <= y2 + h2 &&
+                y1 + h1 >= y2)
+        } else {
+            let s1 = createRect(x1, y1, w1, h1)
+            let s2 = createRect(x2, y2, w2, h2)
+            
+            s1.setRotationCenter()
+            s2.setRotationCenter()
+
+            s1.rotate(a1)
+            s2.rotate(a2)
+
+            return polyPoly(s1, s2,true)
+        }
     }
 
-    /** Returns the collision between two rotating rectangles. (rotating is around the center of the rectangle) */
-    function rectRectRotate(x1, y1, w1, h1, a1, x2, y2, w2, h2, a2) {
-        let s1 = createRect(x1, y1, w1, h1)
-        let s2 = createRect(x2, y2, w2, h2)
+
+    /** Returns the collision between a rectangle and a circle. */
+    function rectCircle(x, y, w, h, cx, cy, cr) {
         
-        s1.setRotationCenter()
-        s2.setRotationCenter()
+        // temp variables
+        let testX = cx, testY = cy
 
-        s1.rotate(a1)
-        s2.rotate(a2)
+        // finding the closest edge
+        if (cx < x) {testX = x}
+        else if (cx > x + w) {testX = x + w}
+        if (cy < y) {testY = y}
+        else if (cy > y + h) {testY = y + h}
 
-        return polyPoly(s1, s2,true)
+        // checking distance to the edge
+        let dx = cx - testX
+        let dy = cy - testY
+        let dist = Math.sqrt(dx * dx + dy * dy)
+
+        return dist < cr
     }
+
+    /** Detects the collision between a rectangle and a line. If return points is true, an array containing the points where the line is intersecting with the rectangle will be returned if a collision is happening. */
+    function rectLine(x, y, w, h, x1, y1, x2, y2, returnPoints=false) {
+
+        // checking for a collision between each edge and the line
+        let top = lineLine(x1, y1, x2, y2, x, y, x + w, y, returnPoints)
+        let bot = lineLine(x1, y1, x2, y2, x, y + h, x + w, y + h, returnPoints)
+        let lef = lineLine(x1, y1, x2, y2, x, y, x, y + h, returnPoints)
+        let rig = lineLine(x1, y1, x2, y2, x + w, y, x + w, y + h, returnPoints)
+
+        // returning the collision
+        if (!returnPoints) {return top || bot || lef || rig}
+        
+        // getting the points
+        let pts = []
+        if (top) {pts.push(top)}
+        if (bot) {pts.push(bot)}
+        if (lef) {pts.push(lef)}
+        if (rig) {pts.push(rig)}
+        return pts
+
+    }   
+
+    /** Returns true if the given point is inside the rectangle. */
+    function rectPoint(rx, ry, rw, rh, px, py) {
+        return  (px >= rx &&        // right of the left edge AND
+                px <= rx + rw &&   // left of the right edge AND
+                py >= ry &&        // below the top AND
+                py <= ry + rh) 
+    }
+
+    /** Returns true if the given rectangle is colliding with the given polygon. */
+    function rectPoly(rx, ry, rw, rh, xpoints, ypoints) {
+
+        let shape1 = createRect(rx,ry,rw,rh)
+        let shape2 = createPolygon(xpoints, ypoints)
+
+        return polyPoly(shape1, shape2)
+    }
+
+    // ===============================
+    // CIRCLE DETECTION
+    // ===============================
 
     /** Detects the collision between the two given circles. */
     function circleCircle(x1, y1, r1, x2, y2, r2) {
@@ -330,32 +416,25 @@ let collision = (function () {
         return dist < r1 + r2
     }
 
-    /** Returns the collision between a rectangle and a circle. */
-    function rectEllipse(x, y, w, h, cx, cy, cw, ch) {
-
-        let r = createRect(x,y,w,h)
-        let c = createEllipse(cx, cy, cw, ch)
-
-        return polyPoly(r,c)
-    }
-
-
     // ===============================
     // EXPORTING
     // ===============================
-    gen.createRect = createRect
-    gen.createRectCenter = createRectCenter
-    gen.createCircle = createCircle
-    gen.createEllipse = createEllipse
-    gen.createPolygon = createPolygon
-    gen.createPolygonFromVecs = createPolygonFromVecs
-    gen.createTriangle = createTriangle
-    col.gen = gen
+    gen.createRect              = createRect
+    gen.createRectCenter        = createRectCenter
+    gen.createCircle            = createCircle
+    gen.createEllipse           = createEllipse
+    gen.createPolygon           = createPolygon
+    gen.createPolygonFromVecs   = createPolygonFromVecs
+    gen.createTriangle          = createTriangle
+    col.gen                     = gen
 
     // collision
     col.rectRect                = rectRect
-    col.rectRectRotate          = rectRectRotate
-    col.rectEllipse             = rectEllipse
+    col.rectCircle              = rectCircle
+    col.rectLine                = rectLine
+    col.rectPoly                = rectPoly
+    col.rectPoint               = rectPoint
+
     col.circleCircle            = circleCircle
     col.lineLine                = lineLine
     col.polyPoint               = polyPoint
