@@ -76,6 +76,9 @@ let collision = (function () {
         this.rotationCenter = this.center.copy()
         this.rotation = 0  
 
+        // used to apply a constant rotation to this shape
+        this.savedVertices = []
+
         /** Draws this shape to a p5.js canvas, if included. */
         this.drawShape = function(){}
         this.createDrawFunction()
@@ -110,6 +113,16 @@ let collision = (function () {
             for (let i = 0; i < this.vertices.length; i++) {vertex(this.vertices[i].x,this.vertices[i].y)}
             endShape(CLOSE)
         } : function(){}
+    }
+
+    /** Saves the current vertices. Wich can then be used to apply a rotation onto. */
+    shape.prototype.save = function() {
+        this.savedVertices = [...this.vertices]
+    }
+
+    /** Loads the saved vertices, recommended to be used before rotating the shape. This will make sure that there is a constant rotation applied to this shape. */
+    shape.prototype.load = function() {
+        this.vertices = [...this.savedVertices]
     }
 
     // ===============================
@@ -174,6 +187,8 @@ let collision = (function () {
             ellipse.vertices.push(new vec(x, y))
 
         }  
+
+        ellipse.center = new vec(xp, yp)
         
         return ellipse
     
@@ -188,6 +203,21 @@ let collision = (function () {
         }
 
         return poly
+    }
+
+    /** Creates a triangle at the given position with the given base and height. */
+    function createTriangle(x, y, base, height) {
+
+        let triangle = new shape()
+
+        triangle.vertices.push(new vec(x, y))
+        triangle.vertices.push(new vec(x + base, y))
+        triangle.vertices.push(new vec(x + base / 2, y + height))
+
+        triangle.center = new vec(x + base / 2, y + height / 2)
+        
+        return triangle
+
     }
 
     /** Returns a polygon from the given vector objects. The vectors need to have x and y components. */
@@ -319,6 +349,7 @@ let collision = (function () {
     gen.createEllipse = createEllipse
     gen.createPolygon = createPolygon
     gen.createPolygonFromVecs = createPolygonFromVecs
+    gen.createTriangle = createTriangle
     col.gen = gen
 
     // collision
