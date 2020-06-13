@@ -6,4 +6,4 @@
  collision.js : https://cdn.jsdelivr.net/gh/AsQuiet/BriefPhysics/CollisionJs/collision.js
  
 ## Useful articles
- http://www.jeffreythompson.org/collision-detection/point-rect.php
+ http://www.jeffreythompson.org/collision-detection/table_of_contents.php
